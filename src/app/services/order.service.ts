@@ -43,6 +43,7 @@ export interface Order {
     deliveredAt?: Date;
     cancelledAt?: Date;
     cancelReason?: string;
+    trackingCode?: string;
 }
 
 export interface OrderStats {

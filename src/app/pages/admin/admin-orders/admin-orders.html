@@ -272,6 +272,12 @@
                   {{ selectedOrder.paymentStatus | titlecase }}
                 </span>
               </p>
+              <p *ngIf="selectedOrder.trackingCode">
+                <span class="text-gray-400 w-24 inline-block">Tracking</span>
+                <span class="px-2 py-0.5 bg-gray-100 border border-gray-300 rounded font-mono text-sm tracking-widest text-indigo-700 font-bold">
+                  {{ selectedOrder.trackingCode }}
+                </span>
+              </p>
               <p *ngIf="selectedOrder.specialInstructions">
                 <span class="text-gray-400 w-24 inline-block">Notes</span> {{ selectedOrder.specialInstructions }}
               </p>
