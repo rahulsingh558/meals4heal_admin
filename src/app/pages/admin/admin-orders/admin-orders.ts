@@ -231,6 +231,9 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
       next: (res) => {
         if (res.success) {
           order.orderStatus = nextStatus;
+          if (res.order && res.order.trackingCode) {
+              order.trackingCode = res.order.trackingCode;
+          }
           this.calculateStats();
           this.applyFilters();
         }
