@@ -163,6 +163,9 @@
               <span class="px-2 py-1 text-xs font-medium rounded-full" [class]="getStatusClasses(order.orderStatus)">
                 {{ getStatusText(order.orderStatus) }}
               </span>
+              <div *ngIf="order.trackingCode" class="mt-1">
+                <span class="text-xs font-mono bg-gray-100 text-indigo-700 px-1.5 py-0.5 rounded border border-gray-300">{{ order.trackingCode }}</span>
+              </div>
             </td>
             <!-- Date -->
             <td class="px-4 py-3">
