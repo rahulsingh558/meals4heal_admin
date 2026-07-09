@@ -4,6 +4,7 @@ import { RouterModule, RouterOutlet, Router, NavigationEnd } from '@angular/rout
 import { AdminAuthService } from '../../services/admin-auth.service';
 import { filter, Subscription } from 'rxjs';
 import { AdminSidebarComponent } from '../../pages/admin/sidebar/admin-sidebar.component';
+import { NotificationService, Notification } from '../../services/notification.service';
 
 @Component({
   selector: 'app-admin-layout',
@@ -22,7 +23,13 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   currentRoute = '';
   pageTitle = '';
   showUserMenu = false;
+  showNotificationMenu = false;
   routerSubscription!: Subscription;
+  
+  notifications: Notification[] = [];
+  unreadCount = 0;
+  private notifSub!: Subscription;
+  private unreadSub!: Subscription;
 
   // Navigation items for breadcrumb or header
   navItems = [
@@ -37,6 +44,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   constructor(
     private router: Router,
     private authService: AdminAuthService,
+    private notificationService: NotificationService,
     @Inject(PLATFORM_ID) private platformId: any
   ) {}
 
@@ -57,12 +65,25 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     // Initial update
     this.updateCurrentRoute();
     this.updatePageTitle();
+
+    if (isPlatformBrowser(this.platformId)) {
+      this.notifSub = this.notificationService.notifications$.subscribe(notifs => {
+        this.notifications = notifs;
+      });
+      this.unreadSub = this.notificationService.unreadCount$.subscribe(count => {
+        this.unreadCount = count;
+      });
+    }
   }
 
   ngOnDestroy() {
     if (this.routerSubscription) {
       this.routerSubscription.unsubscribe();
     }
+    if (this.notifSub) this.notifSub.unsubscribe();
+    if (this.unreadSub) this.unreadSub.unsubscribe();
+    
+    this.notificationService.disconnect();
   }
 
   toggleSidebar() {
@@ -71,6 +92,20 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   toggleUserMenu() {
     this.showUserMenu = !this.showUserMenu;
+    if (this.showUserMenu) this.showNotificationMenu = false;
+  }
+
+  toggleNotificationMenu() {
+    this.showNotificationMenu = !this.showNotificationMenu;
+    if (this.showNotificationMenu) this.showUserMenu = false;
+  }
+
+  markAsRead(id: string) {
+    this.notificationService.markAsRead(id);
+  }
+
+  markAllAsRead() {
+    this.notificationService.markAsRead('all');
   }
 
   logout() {

@@ -1,7 +1,7 @@
 export const environment = {
     production: false,
-    backendUrl: 'http://localhost:5001',
-    apiUrl: 'http://localhost:5001/api',
+    backendUrl: 'https://api.meals4heal.in',
+    apiUrl: 'https://api.meals4heal.in/api',
     mappls: {
         apiKey: '771985f5b0af98e110a1b13a73e27767',
         restaurantELoc: '560037',

@@ -21,14 +21,15 @@ export class AdminAuthService {
   private readonly TOKEN_KEY = 'admin_token';
   private readonly USER_KEY = 'admin_user';
   private readonly API_URL = `${environment.apiUrl}/auth`;
-  private isBrowser: boolean;
 
   constructor(
     private http: HttpClient,
-    private router: Router,
-    @Inject(PLATFORM_ID) platformId: Object
-  ) {
-    this.isBrowser = isPlatformBrowser(platformId);
+    private router: Router
+  ) {}
+
+  // Check if we are in browser
+  private isBrowser(): boolean {
+    return typeof window !== 'undefined' && typeof localStorage !== 'undefined';
   }
 
   // Login with backend
@@ -39,7 +40,7 @@ export class AdminAuthService {
     }).pipe(
       tap(response => {
         // Store token and user data
-        if (this.isBrowser) {
+        if (this.isBrowser()) {
           localStorage.setItem(this.TOKEN_KEY, response.token);
           localStorage.setItem(this.USER_KEY, JSON.stringify(response.user));
         }
@@ -49,20 +50,20 @@ export class AdminAuthService {
 
   // Get stored token
   getToken(): string | null {
-    if (!this.isBrowser) return null;
+    if (!this.isBrowser()) return null;
     return localStorage.getItem(this.TOKEN_KEY);
   }
 
   // Get stored user
   getUser(): any {
-    if (!this.isBrowser) return null;
+    if (!this.isBrowser()) return null;
     const userStr = localStorage.getItem(this.USER_KEY);
     return userStr ? JSON.parse(userStr) : null;
   }
 
   // Check if admin is logged in
   isLoggedIn(): boolean {
-    if (!this.isBrowser) return false;
+    if (!this.isBrowser()) return false;
     const token = this.getToken();
     const user = this.getUser();
     return !!(token && user && user.role === 'admin');
@@ -70,7 +71,7 @@ export class AdminAuthService {
 
   // Logout method
   logout(): void {
-    if (this.isBrowser) {
+    if (this.isBrowser()) {
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.USER_KEY);
     }
@@ -85,7 +86,7 @@ export class AdminAuthService {
 
   // Clear all auth data
   clearAuth(): void {
-    if (this.isBrowser) {
+    if (this.isBrowser()) {
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.USER_KEY);
     }

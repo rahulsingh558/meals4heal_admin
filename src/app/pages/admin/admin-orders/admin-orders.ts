@@ -2,6 +2,8 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } 
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { OrderService, Order } from '../../../services/order.service';
+import { WebSocketService } from '../../../services/websocket.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   standalone: true,
@@ -45,10 +47,12 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
   totalRevenue = 0;
 
   private refreshTimer: any;
+  private socketSubscription?: Subscription;
   isBrowser = false;
 
   constructor(
     private orderService: OrderService,
+    private webSocket: WebSocketService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) platformId: Object
   ) {
@@ -59,10 +63,20 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
     this.loadOrders();
     // Auto-refresh every 30 seconds
     this.refreshTimer = setInterval(() => this.loadOrders(), 30000);
+    
+    // Subscribe to real-time new order notifications
+    this.webSocket.emit('join-admin', {});
+    this.socketSubscription = this.webSocket.listen('new-order').subscribe((order: any) => {
+      alert(`New Order Received: #${order.orderNumber || 'N/A'}`);
+      this.refreshOrders();
+    });
   }
 
   ngOnDestroy() {
     clearInterval(this.refreshTimer);
+    if (this.socketSubscription) {
+      this.socketSubscription.unsubscribe();
+    }
   }
 
   /* =========================
