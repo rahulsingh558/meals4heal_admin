@@ -3,7 +3,9 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { OrderService, OrderStats, BestSellingItem, Order } from '../../../services/order.service';
+import { AdminBusService } from '../../../services/admin-bus.service';
 import { environment } from '../../../../environments/environment';
+import { Subscription } from 'rxjs';
 
 @Component({
   standalone: true,
@@ -42,10 +44,12 @@ export class AdminDashboard implements OnInit, OnDestroy {
   revenuePolylinePoints = '';
 
   private refreshTimer: any;
+  private busSub?: Subscription;
 
   constructor(
     private orderService: OrderService,
     private http: HttpClient,
+    private bus: AdminBusService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) platformId: Object
   ) {
@@ -57,11 +61,13 @@ export class AdminDashboard implements OnInit, OnDestroy {
       this.loadDashboardData();
       this.startSystemStatsPolling();
       this.refreshTimer = setInterval(() => this.loadDashboardData(), 60000);
+      this.busSub = this.bus.refreshDashboard$.subscribe(() => this.loadDashboardData());
     }
   }
 
   ngOnDestroy() {
     clearInterval(this.refreshTimer);
+    this.busSub?.unsubscribe();
   }
 
   /* =========================

@@ -5,15 +5,20 @@ import { AdminAuthService } from '../../services/admin-auth.service';
 import { filter, Subscription } from 'rxjs';
 import { AdminSidebarComponent } from '../../pages/admin/sidebar/admin-sidebar.component';
 import { NotificationService, Notification } from '../../services/notification.service';
+import { ToastContainerComponent } from '../toast/toast-container.component';
+import { ConfirmDialogComponent } from '../confirm/confirm-dialog.component';
+import { AdminBusService } from '../../services/admin-bus.service';
 
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
   imports: [
-    CommonModule, 
-    RouterModule, 
-    RouterOutlet, 
-    AdminSidebarComponent
+    CommonModule,
+    RouterModule,
+    RouterOutlet,
+    AdminSidebarComponent,
+    ToastContainerComponent,
+    ConfirmDialogComponent
   ],
   templateUrl: './admin-layout.component.html',
   styleUrls: ['./admin-layout.component.css']
@@ -45,6 +50,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     private router: Router,
     private authService: AdminAuthService,
     private notificationService: NotificationService,
+    private bus: AdminBusService,
     @Inject(PLATFORM_ID) private platformId: any
   ) {}
 
@@ -154,25 +160,23 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     return '/' + segments.slice(0, index + 1).join('/');
   }
 
-  // Action methods for buttons
+  // Action methods for buttons — delegated to the currently routed page via the bus
   refreshDashboard() {
-    console.log('Refreshing dashboard data...');
-    // Implement refresh logic - could emit an event to child component
+    this.bus.emitRefreshDashboard();
   }
 
   exportData() {
-    console.log('Exporting data...');
-    // Implement export logic
+    this.bus.emitExportOrders();
   }
 
-  addNewItem() {
-    console.log('Adding new menu item...');
-    // Implement add item logic
-  }
-
-  // Handle search
+  // Handle search — route the header search to the relevant list page
   onSearch(query: string) {
-    // Implement search logic based on current route
-    console.log('Search query:', query, 'on route:', this.currentRoute);
+    const q = query.trim();
+    if (!q) return;
+    if (this.currentRoute.startsWith('/admin/customers')) {
+      this.router.navigate(['/admin/customers'], { queryParams: { q } });
+    } else {
+      this.router.navigate(['/admin/orders'], { queryParams: { q } });
+    }
   }
 }

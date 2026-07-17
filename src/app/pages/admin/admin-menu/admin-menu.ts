@@ -2,6 +2,7 @@ import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angu
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { FoodApiService, ApiFood } from '../../../services/food-api.service';
+import { ConfirmService } from '../../../services/confirm.service';
 import { environment } from '../../../../environments/environment';
 interface Addon {
   id: number;
@@ -61,6 +62,7 @@ export class AdminMenuComponent implements OnInit {
 
   constructor(
     private foodApi: FoodApiService,
+    private confirm: ConfirmService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) platformId: Object
   ) {
@@ -211,10 +213,14 @@ export class AdminMenuComponent implements OnInit {
     }
   }
 
-  deleteItem(id: string, name: string) {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) {
-      return;
-    }
+  async deleteItem(id: string, name: string) {
+    const ok = await this.confirm.ask({
+      title: 'Delete menu item?',
+      message: `"${name}" will be permanently removed from the menu.`,
+      confirmText: 'Delete',
+      danger: true
+    });
+    if (!ok) return;
 
     this.loading = true;
     this.foodApi.deleteFood(id).subscribe({

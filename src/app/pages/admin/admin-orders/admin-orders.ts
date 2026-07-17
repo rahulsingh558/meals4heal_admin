@@ -1,8 +1,13 @@
 import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { OrderService, Order } from '../../../services/order.service';
 import { WebSocketService } from '../../../services/websocket.service';
+import { ToastService } from '../../../services/toast.service';
+import { ConfirmService } from '../../../services/confirm.service';
+import { AdminBusService } from '../../../services/admin-bus.service';
+import { downloadCsv } from '../../../utils/csv.util';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -48,11 +53,17 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
 
   private refreshTimer: any;
   private socketSubscription?: Subscription;
+  private busSubscription?: Subscription;
+  private routeSubscription?: Subscription;
   isBrowser = false;
 
   constructor(
     private orderService: OrderService,
     private webSocket: WebSocketService,
+    private toast: ToastService,
+    private confirm: ConfirmService,
+    private bus: AdminBusService,
+    private route: ActivatedRoute,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) platformId: Object
   ) {
@@ -63,20 +74,31 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
     this.loadOrders();
     // Auto-refresh every 30 seconds
     this.refreshTimer = setInterval(() => this.loadOrders(), 30000);
-    
+
     // Subscribe to real-time new order notifications
     this.webSocket.emit('join-admin', {});
     this.socketSubscription = this.webSocket.listen('new-order').subscribe((order: any) => {
-      alert(`New Order Received: #${order.orderNumber || 'N/A'}`);
+      this.toast.info('New order received', `Order #${order.orderNumber || 'N/A'} just came in.`);
       this.refreshOrders();
+    });
+
+    // Export triggered from the layout header button
+    this.busSubscription = this.bus.exportOrders$.subscribe(() => this.exportOrders());
+
+    // Pick up a search query passed from the header search bar
+    this.routeSubscription = this.route.queryParams.subscribe(params => {
+      if (params['q']) {
+        this.searchQuery = params['q'];
+        this.applyFilters();
+      }
     });
   }
 
   ngOnDestroy() {
     clearInterval(this.refreshTimer);
-    if (this.socketSubscription) {
-      this.socketSubscription.unsubscribe();
-    }
+    this.socketSubscription?.unsubscribe();
+    this.busSubscription?.unsubscribe();
+    this.routeSubscription?.unsubscribe();
   }
 
   /* =========================
@@ -216,15 +238,20 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
     this.selectedOrder = null;
   }
 
-  updateOrderStatus(order: Order) {
+  async updateOrderStatus(order: Order) {
     const flow = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered'];
     const idx = flow.indexOf(order.orderStatus);
     if (idx === -1 || idx === flow.length - 1) {
-      alert('Order is already at the final status or cannot be advanced.');
+      this.toast.info('No action', 'Order is already at the final status or cannot be advanced.');
       return;
     }
     const nextStatus = flow[idx + 1];
-    if (!confirm(`Advance order #${order.orderNumber} to "${this.getStatusText(nextStatus)}"?`)) return;
+    const ok = await this.confirm.ask({
+      title: `Advance order #${order.orderNumber}?`,
+      message: `Move this order to "${this.getStatusText(nextStatus)}".`,
+      confirmText: 'Advance'
+    });
+    if (!ok) return;
 
     this.updatingId = order._id || null;
     this.orderService.updateOrderStatus(order._id!, nextStatus).subscribe({
@@ -236,21 +263,30 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
           }
           this.calculateStats();
           this.applyFilters();
+          this.toast.success('Order updated', `#${order.orderNumber} is now ${this.getStatusText(nextStatus)}.`);
         }
         this.updatingId = null;
         this.cdr.detectChanges();
       },
       error: (err) => {
         console.error('Status update failed:', err);
-        alert('Failed to update order status');
+        this.toast.error('Update failed', 'Failed to update order status.');
         this.updatingId = null;
         this.cdr.detectChanges();
       }
     });
   }
 
-  cancelOrder(order: Order) {
-    if (!confirm(`Cancel order #${order.orderNumber}?`)) return;
+  async cancelOrder(order: Order) {
+    const ok = await this.confirm.ask({
+      title: `Cancel order #${order.orderNumber}?`,
+      message: 'This will mark the order as cancelled.',
+      confirmText: 'Cancel order',
+      cancelText: 'Keep',
+      danger: true
+    });
+    if (!ok) return;
+
     this.updatingId = order._id || null;
     this.orderService.updateOrderStatus(order._id!, 'cancelled').subscribe({
       next: (res) => {
@@ -258,16 +294,41 @@ export class AdminOrdersComponent implements OnInit, OnDestroy {
           order.orderStatus = 'cancelled';
           this.calculateStats();
           this.applyFilters();
+          this.toast.success('Order cancelled', `#${order.orderNumber} was cancelled.`);
         }
         this.updatingId = null;
         this.cdr.detectChanges();
       },
       error: () => {
-        alert('Failed to cancel order');
+        this.toast.error('Cancel failed', 'Failed to cancel order.');
         this.updatingId = null;
         this.cdr.detectChanges();
       }
     });
+  }
+
+  /** Export the currently filtered orders to CSV. */
+  exportOrders() {
+    if (!this.filteredOrders.length) {
+      this.toast.info('Nothing to export', 'There are no orders matching the current filters.');
+      return;
+    }
+    const rows = this.filteredOrders.map(o => ({
+      OrderNumber: o.orderNumber,
+      Date: this.formatDate(o.createdAt),
+      Time: this.formatTime(o.createdAt),
+      Customer: o.customerName,
+      Phone: o.customerPhone,
+      Email: o.customerEmail,
+      Items: this.getItemNames(o.items),
+      Status: this.getStatusText(o.orderStatus),
+      Payment: o.paymentMethod,
+      PaymentStatus: o.paymentStatus,
+      Total: o.totalAmount,
+      Address: this.getDeliveryAddressStr(o.deliveryAddress)
+    }));
+    downloadCsv(`orders-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+    this.toast.success('Exported', `${rows.length} orders downloaded as CSV.`);
   }
 
   /* =========================

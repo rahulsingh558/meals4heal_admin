@@ -3,6 +3,8 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
+import { ToastService } from '../../../services/toast.service';
+import { downloadCsv } from '../../../utils/csv.util';
 
 interface DayRevenue {
   _id: { year: number; month: number; day: number };
@@ -50,6 +52,7 @@ export class AdminAnalyticsComponent implements OnInit {
 
   constructor(
     private http: HttpClient,
+    private toast: ToastService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
@@ -151,5 +154,20 @@ export class AdminAnalyticsComponent implements OnInit {
 
   get maxBestSelling(): number {
     return Math.max(1, ...this.analytics.bestSelling.map(b => b.totalSold));
+  }
+
+  /** Export the per-day revenue/orders series to CSV. */
+  exportRevenue() {
+    if (!this.analytics.revenueByDay.length) {
+      this.toast.info('Nothing to export', 'No revenue data for the selected period.');
+      return;
+    }
+    const rows = this.analytics.revenueByDay.map(d => ({
+      Date: `${d._id.day}/${d._id.month}/${d._id.year}`,
+      Revenue: d.revenue,
+      Orders: d.orders
+    }));
+    downloadCsv(`analytics-revenue-${this.selectedDays}d.csv`, rows);
+    this.toast.success('Exported', `${rows.length} days of revenue downloaded as CSV.`);
   }
 }
